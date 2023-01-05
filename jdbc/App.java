@@ -35,7 +35,11 @@ class Application {
 		DevVei,
 		VeiDet,
 		ProLim,
-		UptTip
+		UptTip,
+		BstCli,
+		ConNao,
+		NumVia,
+		BstDri
     }
 
     private static Application __instance = null;
@@ -60,6 +64,10 @@ class Application {
 		__dbMethods.put(Option.VeiDet, new DbWorker() {public void doWork() { Application.this.getVehicleCalcs();}});
 		__dbMethods.put(Option.ProLim, new DbWorker() {public void doWork() { Application.this.checkPropLimit();}});
 		__dbMethods.put(Option.UptTip, new DbWorker() {public void doWork() { Application.this.updateTipo();}});
+		__dbMethods.put(Option.BstCli, new DbWorker() {public void doWork() { Application.this.bestClientInYear();}});
+		__dbMethods.put(Option.ConNao, new DbWorker() {public void doWork() { Application.this.driversWithoutTrips();}});
+		__dbMethods.put(Option.NumVia, new DbWorker() {public void doWork() { Application.this.propsCarsTripsNumber();}});
+		__dbMethods.put(Option.BstDri, new DbWorker() {public void doWork() { Application.this.bestDriverInYear();}});
 	}
 
     private void Login(String jdbcURL, String username, String password) throws SQLException {
@@ -93,6 +101,10 @@ class Application {
 			System.out.println(" 6.  Obter detalhes de veiculo");
 			System.out.println(" 7.  Verificar o limite de carro para proprietarios");
 			System.out.println(" 8.  Alterar tipo");
+			System.out.println(" 9.  Obter o melhor cliente de certo ano");
+			System.out.println(" 10. Obter os condutores sem viagens");
+			System.out.println(" 11. Numero de viagens dos carros de um proprietatio");
+			System.out.println(" 12. Condutor com mais custo final de certo ano");
 			System.out.println();
 			System.out.print(" >");
 			String result = reader.readLine();
@@ -705,6 +717,79 @@ class Application {
 			System.out.println("Erro: "+e.getMessage());
 		}
 		System.out.println("Tipo alterado");
+	}
+
+	private void bestClientInYear() {
+		String cmd = "select idpessoa, nproprio, apelido, nif from (select idpessoa, nproprio, apelido, nif, "+
+		"count(*) as nrviagens from clienteviagem c inner join pessoa p on p.id = c.idpessoa inner join viagem v on v.idsistema = "+
+		"c.viagem where (date_part('year', dtinicio) = ?) group by idpessoa, nproprio, apelido, nif) t "+
+		"group by idpessoa, nproprio, apelido, nif, nrviagens having nrviagens = max(nrviagens)";
+
+		System.out.println("Insira o ano a procurar");
+
+		try (PreparedStatement pstmt = con.prepareStatement(cmd)){
+			pstmt.setInt(1, Integer.parseInt(reader.readLine().trim()));
+			ResultSet rs = pstmt.executeQuery();
+			System.out.println("Id\tNome\tApelido\t\tNr ident");
+			while(rs.next()){
+				System.out.println(rs.getInt(1)+"\t"+rs.getString(2)+
+				"\t"+rs.getString(3)+"\t\t"+rs.getString(4));
+			}
+		} catch(Exception e) {
+			System.out.println("Erro: "+e.getMessage());
+		}
+	}
+
+	private void driversWithoutTrips() {
+		String cmd = "select id, nproprio, apelido, nif from condutor c inner join pessoa p "+
+		"on c.idpessoa = p.id left join viagem v on v.condutor = c.idpessoa where v.condutor is null";
+
+		try {
+			Statement stmt = con.createStatement();
+			ResultSet rs = stmt.executeQuery(cmd);
+			System.out.println("Id\tNome\tApelido\t\tNr ident");
+			while(rs.next()){
+				System.out.println(rs.getInt(1)+"\t"+rs.getString(2)+
+				"\t"+rs.getString(3)+"\t\t"+rs.getString(4));
+			}
+		} catch(Exception e) {
+			System.out.println("Erro: "+e.getMessage());
+		}
+	}
+
+	private void propsCarsTripsNumber() {
+		String cmd = "select (count(*)) from viagem v inner join veiculo v2 on v.veiculo "+
+		"= v2.id inner join pessoa p on p.id = v2.proprietario where (nif = ? and date_part('year', dtviagem) = ?)";
+
+		System.out.println("Insira o nif do proprietario");
+
+		try (PreparedStatement pstmt = con.prepareStatement(cmd)){
+			pstmt.setString(1, reader.readLine().trim());
+			System.out.println("Insira o ano a procurar");
+			pstmt.setInt(2, Integer.parseInt(reader.readLine().trim()));
+			ResultSet rs = pstmt.executeQuery();
+			if(rs.next())System.out.println("Os carros do proprietario fizeram "+rs.getInt(1)+" viagens");
+		} catch(Exception e) {
+			System.out.println("Erro: "+e.getMessage());
+		}
+	}
+
+	private void bestDriverInYear() {
+		String cmd = "select nproprio, apelido, noident, morada from viagem v left join pessoa p on "+
+		"p.id = v.condutor where date_part('year', dtviagem) = ? group by (nproprio, apelido, noident, "+
+		"morada) order by count(valfinal) desc limit 1"; 
+
+		System.out.println("Insira o ano a procurar");
+
+		try (PreparedStatement pstmt = con.prepareStatement(cmd)){
+			pstmt.setInt(1, Integer.parseInt(reader.readLine().trim()));
+			ResultSet rs = pstmt.executeQuery();
+			System.out.println("Nome\tApelido\t\tNr ident\tmorada");
+			if(rs.next())System.out.println(rs.getString(1)+"\t"+rs.getString(2)+
+			"\t\t"+rs.getString(3)+"\t"+rs.getString(4));
+		} catch(Exception e) {
+			System.out.println("Erro: "+e.getMessage());
+		}
 	}
 
 	public void Run(String jdbcURL, String username, String password) throws Exception {

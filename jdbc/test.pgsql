@@ -48,3 +48,12 @@ select * from proprietario
 select idpessoa, count(idpessoa)
 from veiculo left join proprietario on veiculo.proprietario = proprietario.idpessoa
 group by (idpessoa)
+
+select (idpessoa, nproprio, apelido, nif) from (select idpessoa, nproprio, apelido, nif, count(*) as nrviagens from clienteviagem c inner join pessoa p on p.id = c.idpessoa inner join viagem v on v.idsistema = c.viagem where (date_part('year', dtinicio) = 2021) group by idpessoa, nproprio, apelido, nif) t group by idpessoa, nproprio, apelido, nif, nrviagens having nrviagens = max(nrviagens)
+
+select (id, nproprio, apelido, nif) from condutor c inner join pessoa p on c.idpessoa = p.id left join viagem v on v.condutor = c.idpessoa where v.condutor is null;
+
+select (count(*)) from viagem v inner join veiculo v2 on v.veiculo = v2.id inner join pessoa p on p.id = v2.proprietario where (nif = ? and date_part('year', dtviagem) = ?);
+
+
+
