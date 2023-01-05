@@ -55,5 +55,5 @@ select (id, nproprio, apelido, nif) from condutor c inner join pessoa p on c.idp
 
 select (count(*)) from viagem v inner join veiculo v2 on v.veiculo = v2.id inner join pessoa p on p.id = v2.proprietario where (nif = ? and date_part('year', dtviagem) = ?);
 
-
+select nproprio, apelido, noident, morada from viagem v left join pessoa p on p.id = v.condutor where date_part('year', dtviagem) = 2021 group by (nproprio, apelido, noident, morada) order by count(valfinal) desc limit 1; 
 
