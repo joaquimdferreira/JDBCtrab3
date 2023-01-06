@@ -6,11 +6,9 @@ import java.io.InputStreamReader;
 import java.sql.*;
 import java.util.Calendar;
 import java.util.HashMap;
-
-import javax.print.DocFlavor.READER;
-
 import java.util.ArrayList;
 
+//Code entry point and setting up DB connection parameters
 public class App {
     static String jdbcURL = "jdbc:postgresql://10.62.73.73:5432/mp27";
     static String username = "mp27";
@@ -21,11 +19,13 @@ public class App {
 	}
 }
 
+//Runs functions when asked to
 interface DbWorker {
 	void doWork();
 }
 
 class Application {
+	//Choices available for the user in a typified manner
     private enum Option {
         Unknown,
         Exit,
@@ -42,11 +42,13 @@ class Application {
 		BstDri
     }
 
+	//Class propertis
     private static Application __instance = null;
 	private HashMap<Option,DbWorker> __dbMethods;
 	private Connection con = null;
 	BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
 
+	//Create an instance of the class
     public static Application getInstance() {
 		if(__instance == null) 
 		{
@@ -55,6 +57,8 @@ class Application {
 		return __instance;
 	}
 
+	//Class constructor with an hashmap that links all the typifiedoptions to their
+	//resptective functions in the class
     private Application() {
 		__dbMethods = new HashMap<Option,DbWorker>();
         __dbMethods.put(Option.AddCon, new DbWorker() {public void doWork() { Application.this.insertCondutor();}});
@@ -70,10 +74,12 @@ class Application {
 		__dbMethods.put(Option.BstDri, new DbWorker() {public void doWork() { Application.this.bestDriverInYear();}});
 	}
 
+	//Set the connection to the database
     private void Login(String jdbcURL, String username, String password) throws SQLException {
 		con = DriverManager.getConnection(jdbcURL, username, password);
 	}
 
+	//Close the connection opened in the Login function
     private void Logout() throws SQLException {
 		if (con != null) {
 			con.close();
@@ -81,11 +87,13 @@ class Application {
 		con = null;
 	}
 
+	//Clears the console by printing a bunch of lines
     private final static void clearConsole() throws Exception {
 	    for (int y = 0; y < 25; y++) //console is 80 columns and 25 lines
 	    System.out.println("\n");
 	}
 
+	//Prints all the possibles options for the user
     private Option DisplayMenu() {
 		Option option=Option.Unknown;
         
@@ -116,6 +124,7 @@ class Application {
 
 	}
 
+	//Insert a driver into the database making sure to check if there is a person related to it
 	private void insertCondutor() {
 		String cmd = "INSERT INTO condutor VALUES(?, ?, ?)";
 		int id;
@@ -153,6 +162,7 @@ class Application {
 		}
 	}
 
+	//Evaluates the format of the given driver license, supposed to be aa-1234567 format
 	private void checkCConducao(String ncconducao) throws IllegalArgumentException{
 		if(ncconducao.length() != 10)throw new IllegalArgumentException("Formato invalido para carta de condução");
 
@@ -179,6 +189,7 @@ class Application {
 		(int) ncconducao.charAt(5) <= 57))throw new IllegalArgumentException("formato errado para matricula");
 	}
 
+	//Checks for the person related to the given id and its type
 	private boolean doesPersonExist(int id, String tipo) {
 		String cmd = "SELECT * FROM pessoa where id = ? and atrdic = ?";
 		ResultSet result;
@@ -199,6 +210,7 @@ class Application {
 		}
 	}
 
+	//Creates a new person with the given id and type, asking for input when they arent given
 	private boolean createPerson(int id, String tipo) {
 		String cmd = "INSERT INTO pessoa VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)";
 		String noident, nif, nproprio, apelido, morada, localidade;
@@ -272,6 +284,7 @@ class Application {
 		}
 	}
 
+	//Moves all the 5+ years old vehicles to the VEICULO_OLD table, but first chekcs if table has been created
 	private void refreshOldTable() {
 		String checkTableExist = "SELECT * FROM VEICULO_OLD";
 		Boolean exists;
@@ -287,6 +300,7 @@ class Application {
 		updateTablesData();
 	}
 
+	//Class mimicking the VEICULO_OLD table schema to store query results and make inserts
 	private class VeiculoOldScheme{
 		int id;
 		String matricula;
@@ -299,6 +313,7 @@ class Application {
 		double distance;
 	}
 
+	//Moves aa vehicle to VEICULO_OLD table by its license plate
 	private void devalueByLicensePlate(){
 		String checkTableExist = "SELECT * FROM VEICULO_OLD";
 		Boolean exists;
@@ -344,6 +359,7 @@ class Application {
 		}
 	}
 
+	//Takes a result set from a query to veiculo old and transforms it into an object
 	private VeiculoOldScheme extractVehicleOld(ResultSet rs) throws SQLException {
 		VeiculoOldScheme vos = new VeiculoOldScheme();
 		vos.id = rs.getInt(1);
@@ -358,6 +374,7 @@ class Application {
 		return vos;
 	}
 
+	//Makes the real insertion into the database into VEICULO_OLD tabe
 	private void insertVehicleOld(VeiculoOldScheme vos) {
 		String insertCmd = "INSERT INTO veiculo_old VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)";
 		try (PreparedStatement pstmt = con.prepareStatement(insertCmd)) {
@@ -376,6 +393,7 @@ class Application {
 		}
 	}
 
+	//Deletes a vehicle from the VEICULO table
 	private void deleteVehicle(VeiculoOldScheme vos) {
 		String deleteFromVeiculoCmd ="DELETE FROM veiculo WHERE id = ?";
 		try (PreparedStatement pstmt = con.prepareStatement(deleteFromVeiculoCmd)){
@@ -386,6 +404,7 @@ class Application {
 		}
 	}
 
+	//Checks the given license plate for the portugal format, either AA11AA or 11AA11
 	private void assureLicenseFormat(String matricula) throws IllegalArgumentException {
 		if(matricula.length() != 6)throw new IllegalArgumentException("Matriculas teem 6 caracteres");
 		char firstChar = matricula.charAt(0);
@@ -418,6 +437,7 @@ class Application {
 		throw new IllegalArgumentException("formato errado para matricula");		
 	}
 
+	//Takes the data from the VEICULO table, sotores it in the VEICULO_OLD and deletes the old data
 	private void updateTablesData() {
 		String getVehicleInfo = "select id, matricula, tipo, modelo, marca, ano, proprietario, count(id) as nrviagens "+
 		"from viagem left join veiculo on viagem.veiculo = veiculo.id "+
@@ -449,6 +469,7 @@ class Application {
 		System.out.println("Tabelas atualizadas");
 	}
 
+	//Calculates the distance for a given vehicle
 	private double calculateDistanceForVeiculo(int id) {
 		String cmd = "select cast(latinicio as numeric), cast(longinicio as numeric),"+
 		" cast(latfim as numeric), cast(longfim as numeric) "+
@@ -473,6 +494,7 @@ class Application {
 		return totalDistance;
 	}
 
+	//Calculates the distance in kilometers according to the coordinates given
 	private static double distance(double lat1, double lon1, double lat2, double lon2, String unit) {
 		if ((lat1 == lat2) && (lon1 == lon2)) {
 			return 0;
@@ -493,6 +515,7 @@ class Application {
 		}
 	}
 
+	//Creates VEICULO_OLD Table in case it hasnt been created
 	private void createOldTable(){
 		System.out.println("Tabela VEICULO_OLD não encontrada, irá ser criada...");
 		String createCmd = "CREATE TABLE VEICULO_OLD (" +
@@ -509,6 +532,7 @@ class Application {
 		}
 	}
 
+	//Prints all vehicles in the VEICULO table
 	private void displayAllVehicles() {
 		String cmd = "SELECT * FROM veiculo";
 		ResultSet rs;
@@ -529,6 +553,7 @@ class Application {
 		}
 	}
 
+	//Class defining the details of a vehicle
 	private class VehicleDetails{
 		int id;
 		String matricula;
@@ -542,6 +567,7 @@ class Application {
 		double custo;
 	}
 
+	//Prints the details for a given vehicle
 	private void getVehicleCalcs() {
 		displayAllVehicles();
 		int id;
@@ -571,6 +597,7 @@ class Application {
 		}
 	}
 
+	//Gets all the data for a given vehicle
     private VehicleDetails extractVehicleData(int id) throws Exception {
 		String findCmd = "select * from veiculo where id = ?";
 		VehicleDetails vd = new VehicleDetails();
@@ -593,6 +620,7 @@ class Application {
 		return vd;
 	}
 
+	//Caculates all the money that the vehicle has made
 	private double calculateCusto(int id) throws Exception {
 		String getCmd = "select sum(valfinal) from viagem where veiculo = ?";
 		PreparedStatement pstmt = con.prepareStatement(getCmd);
@@ -602,6 +630,7 @@ class Application {
 		return rs.getDouble(1);
 	}
 
+	//Calculates the hours of worked that vehicle has done
 	private Time calculateHours(int id) throws Exception {
 		long  milisBetween = 0L;
 		String getFinishedHours = "select hinicio, hfim from viagem where veiculo = ? and hfim is not null";
@@ -619,6 +648,7 @@ class Application {
 		return new Time(milisBetween);
 	}
 
+	//Checks whether a vehicle owner has exceeded the vehicle limit
 	private void checkPropLimit(){
 		String obtainCount = "select idpessoa, count(idpessoa) "+
 		"from veiculo left join proprietario on veiculo.proprietario = proprietario.idpessoa "+
@@ -639,6 +669,7 @@ class Application {
 		}
 	}
 
+	//Deletes vehicles from an onwer to limit its vehicles to 20
 	private void deletePropVei(int id, int n) throws SQLException {
 		String getVehicleList = "select id from veiculo where proprietario = ?";
 		String deleteVehicle = "DELETE FROM veiculo WHERE id = ?";
@@ -655,6 +686,7 @@ class Application {
 
 	}
 
+	//Updates a vehicle type in the database and asks for the changes to make
 	private void updateTipo() {
 		System.out.println("Indique o tipo a alterar");
 		
@@ -719,6 +751,7 @@ class Application {
 		System.out.println("Tipo alterado");
 	}
 
+	//Gets the best client in given year (2c)
 	private void bestClientInYear() {
 		String cmd = "select idpessoa, nproprio, apelido, nif from (select idpessoa, nproprio, apelido, nif, "+
 		"count(*) as nrviagens from clienteviagem c inner join pessoa p on p.id = c.idpessoa inner join viagem v on v.idsistema = "+
@@ -740,6 +773,7 @@ class Application {
 		}
 	}
 
+	//Gets all the driver that havent made any trips (2d)
 	private void driversWithoutTrips() {
 		String cmd = "select id, nproprio, apelido, nif from condutor c inner join pessoa p "+
 		"on c.idpessoa = p.id left join viagem v on v.condutor = c.idpessoa where v.condutor is null";
@@ -757,6 +791,7 @@ class Application {
 		}
 	}
 
+	//Gets the number of trips all owners cars have made (3b)
 	private void propsCarsTripsNumber() {
 		String cmd = "select (count(*)) from viagem v inner join veiculo v2 on v.veiculo "+
 		"= v2.id inner join pessoa p on p.id = v2.proprietario where (nif = ? and date_part('year', dtviagem) = ?)";
@@ -774,6 +809,7 @@ class Application {
 		}
 	}
 
+	//Gets the best driver in given year (3c)
 	private void bestDriverInYear() {
 		String cmd = "select nproprio, apelido, noident, morada from viagem v left join pessoa p on "+
 		"p.id = v.condutor where date_part('year', dtviagem) = ? group by (nproprio, apelido, noident, "+
@@ -792,6 +828,7 @@ class Application {
 		}
 	}
 
+	//Application loop, clears console, prints menu, gets input and processes it, making sure to close the connection
 	public void Run(String jdbcURL, String username, String password) throws Exception {
 		Login(jdbcURL, username, password);
 		Option userInput = Option.Unknown;
